@@ -1,28 +1,8 @@
 #include <raylib.h>
 #include <vector>
 #include <algorithm>
-
-//  Constants 
-const float SCALE = 1.0f;
-
-const int SCREEN_WIDTH = (int)(288 * SCALE);
-const int SCREEN_HEIGHT = (int)(512 * SCALE);
-
-const float GRAVITY = 1000.0f * SCALE;
-const float BIRD_JUMP_FORCE = -300.0f * SCALE;
-const float BIRD_COLLISION_SCALE = 0.7f;
-
-const float PIPE_SPEED = 150.0f * SCALE;
-const float PIPE_SPAWN_DELAY = 1.5f;
-const float PIPE_GAP_SIZE = 120.0f * SCALE;
-
-const float BG_SCROLL_SPEED = 30.0f * SCALE;
-
-enum GameState {
-    MENU,
-    PLAYING,
-    GAME_OVER
-};
+#include "include/constants.hpp"
+#include "include/ui.hpp"
 
 //  Entities 
 
@@ -45,14 +25,21 @@ public:
     void Draw() const {
         float width = texture.width * SCALE;
         float height = texture.height * SCALE;
+        float rotation = std::clamp(velocityY * 0.08f, -25.0f, 30.0f);
 
         Rectangle sourceRect = { 0, 0, (float)texture.width, (float)texture.height };
         
         Rectangle destRect = { position.x, position.y, width, height };
-        
         Vector2 origin = { width / 2.0f, height / 2.0f };
 
-        DrawTexturePro(texture, sourceRect, destRect, origin, 0, WHITE);
+        DrawTexturePro(
+          texture,
+          sourceRect,
+          destRect,
+          origin,
+          rotation,
+          WHITE
+          );
     }
 
     Rectangle GetBounds() const {
@@ -76,8 +63,11 @@ public:
 
     static void Spawn(std::vector<Pipe>& pipes, int pipeWidth) {
         Pipe pipe;
+        
         pipe.position = SCREEN_WIDTH + pipeWidth * SCALE;
+        
         pipe.gapCenterY = (float)GetRandomValue((int)(150 * SCALE), (int)(SCREEN_HEIGHT - 150 * SCALE));
+        
         pipe.scoreGiven = false;
         pipes.push_back(pipe);
     }
@@ -98,7 +88,6 @@ public:
 
         // Bottom pipe
         Rectangle destRectBottom = { position, gapCenterY + PIPE_GAP_SIZE / 2, width, height };
-        
         DrawTexturePro(texture, sourceRect, destRectBottom, origin, 0, WHITE);
 
         // Top pipe
@@ -115,24 +104,23 @@ public:
           position,
           gapCenterY + PIPE_GAP_SIZE / 2,
           (float)texture.width * SCALE,
-          (float)texture.height * SCALE };
+          (float)texture.height * SCALE
+        };
     }
 
     Rectangle GetTopBounds(Texture2D texture) const {
-        return {
+        return { 
           position,
           gapCenterY - PIPE_GAP_SIZE / 2 - (float)texture.height * SCALE,
           (float)texture.width * SCALE,
-          (float)texture.height * SCALE };
+          (float)texture.height * SCALE
+        };
     }
 };
 
 
 int main() {
-    SetConfigFlags(FLAG_WINDOW_RESIZABLE);
-    
     InitWindow(SCREEN_WIDTH, SCREEN_HEIGHT, "Flappy Bird");
-    
     SetTargetFPS(60);
 
     // Load Resources
@@ -152,6 +140,7 @@ int main() {
 
     GameState gameState = MENU;
     int score = 0;
+    int highScore = 0;
 
     while (!WindowShouldClose()) {
         float deltaTime = GetFrameTime();
@@ -162,7 +151,7 @@ int main() {
 
         // Logic
         if (gameState == MENU) {
-            if (IsKeyPressed(KEY_SPACE) || IsMouseButtonPressed(MOUSE_LEFT_BUTTON)) {
+            if (IsKeyPressed(KEY_SPACE)) {
                 bird.Reset();
                 bird.velocityY = BIRD_JUMP_FORCE;
                 gameState = PLAYING;
@@ -192,19 +181,14 @@ int main() {
                 }
 
                 Rectangle birdBounds = bird.GetBounds();
-                
-                //check collision and if collided game over
-                
                 if (CheckCollisionRecs(birdBounds, pipe.GetBottomBounds(pipeTexture)) ||
-                    
                     CheckCollisionRecs(birdBounds, pipe.GetTopBounds(pipeTexture))) {
-                    
                     gameState = GAME_OVER;
+                    if (score > highScore) highScore = score;
                 }
             }
 
             // Remove off screen pipes
-            
             pipes.erase(
                 std::remove_if(pipes.begin(), pipes.end(), [&](const Pipe& pipe) {
                     return pipe.position < -pipeTexture.width * SCALE;
@@ -213,13 +197,14 @@ int main() {
             );
 
             // Screen boundaries
-            Rectangle bounds = bird.GetBounds();
-            if (bounds.y < 0 || bounds.y + bounds.height > SCREEN_HEIGHT) {
+            Rectangle birdBounds = bird.GetBounds();
+            if (birdBounds.y < 0 || birdBounds.y + birdBounds.height > SCREEN_HEIGHT) {
                 gameState = GAME_OVER;
+                if (score > highScore) highScore = score;
             }
         } 
         else if (gameState == GAME_OVER) {
-            if (IsKeyPressed(KEY_SPACE) || IsMouseButtonPressed(MOUSE_LEFT_BUTTON)) {
+            if (IsKeyPressed(KEY_SPACE)) {
                 score = 0;
                 pipes.clear();
                 pipeSpawnTimer = 0.0f;
@@ -233,7 +218,7 @@ int main() {
         BeginDrawing();
         ClearBackground(BLACK);
 
-        // Draw two Background image at a time
+        // Draw Background
         DrawTextureEx(
           backgroundTexture,
           { bgOffset, 0 },
@@ -249,28 +234,34 @@ int main() {
           WHITE
           );
 
-        // Draw Pipes and Bounding Boxes
+        // Draw Pipes
         for (const Pipe& pipe : pipes) {
             pipe.Draw(pipeTexture);
-            DrawRectangleLinesEx(pipe.GetBottomBounds(pipeTexture), 2, BLUE);
-            DrawRectangleLinesEx(pipe.GetTopBounds(pipeTexture), 2, BLUE);
         }
 
-        // Draw Bird and Bounding Box 
+        // Draw Bird
         bird.Draw();
-        DrawRectangleLinesEx(bird.GetBounds(), 2, RED);
 
         // UI
         if (gameState == MENU) {
-            DrawText("CLICK TO START", SCREEN_WIDTH / 2 - MeasureText("CLICK TO START", (int)(20 * SCALE)) / 2, SCREEN_HEIGHT / 2, (int)(20 * SCALE), WHITE);
+            if (UI::Menu(SCREEN_WIDTH, SCREEN_HEIGHT)) {
+                bird.Reset();
+                bird.velocityY = BIRD_JUMP_FORCE;
+                gameState = PLAYING;
+            }
         } 
         else if (gameState == PLAYING) {
-            DrawText(TextFormat("%d", score), SCREEN_WIDTH / 2 - (int)(10 * SCALE), (int)(50 * SCALE), (int)(40 * SCALE), WHITE);
+            UI::ScorePanel(score, SCREEN_WIDTH / 2.0f - 30 * SCALE, 20 * SCALE, 60 * SCALE, 60 * SCALE);
         } 
         else if (gameState == GAME_OVER) {
-            DrawText("GAME OVER", SCREEN_WIDTH / 2 - MeasureText("GAME OVER", (int)(30 * SCALE)) / 2, SCREEN_HEIGHT / 2 - (int)(40 * SCALE), (int)(30 * SCALE), RED);
-            DrawText(TextFormat("Score: %d", score), SCREEN_WIDTH / 2 - MeasureText(TextFormat("Score: %d", score), (int)(20 * SCALE)) / 2, SCREEN_HEIGHT / 2 + (int)(10 * SCALE), (int)(20 * SCALE), WHITE);
-            DrawText("CLICK TO RESTART", SCREEN_WIDTH / 2 - MeasureText("CLICK TO RESTART", (int)(20 * SCALE)) / 2, SCREEN_HEIGHT / 2 + (int)(50 * SCALE), (int)(20 * SCALE), WHITE);
+            if (UI::GameOver(SCREEN_WIDTH, SCREEN_HEIGHT, score, highScore)) {
+                score = 0;
+                pipes.clear();
+                pipeSpawnTimer = 0.0f;
+                bird.Reset();
+                bird.velocityY = BIRD_JUMP_FORCE;
+                gameState = PLAYING;
+            }
         }
 
         EndDrawing();
