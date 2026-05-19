@@ -1,0 +1,8 @@
+# Build artifacts
+main
+*.o
+*.out
+
+# System files
+.DS_Store
+.local/
