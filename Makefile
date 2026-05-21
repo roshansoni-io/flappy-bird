@@ -7,11 +7,14 @@ TARGET = main
 # Source files
 SRC = main.cpp
 
+# Raylib path
+RAYLIB_PATH = raylib
+
 # Compiler flags
-CXXFLAGS = -Wall -std=c++17
+CXXFLAGS = -Wall -std=c++17 -I$(RAYLIB_PATH)
 
 # Raylib libraries
-LIBS = -lraylib
+LIBS = -L$(RAYLIB_PATH) -lraylib -lX11 -lm -lpthread -ldl
 
 # Build target
 all:
