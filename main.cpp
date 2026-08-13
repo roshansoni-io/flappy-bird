@@ -8,6 +8,12 @@
     #include <emscripten/emscripten.h>
 #endif
 
+#ifdef ASSET_DIR
+    static const char* assetPath = ASSET_DIR;
+#else
+    static const char* assetPath = "assets";
+#endif
+
 class Bird {
 public:
     Vector2 position{};
@@ -225,9 +231,9 @@ int main() {
     InitWindow(SCREEN_WIDTH, SCREEN_HEIGHT, "Flappy Bird");
     SetTargetFPS(60);
 
-    birdTexture = LoadTexture("assets/bird.png");
-    backgroundTexture = LoadTexture("assets/background.png");
-    pipeTexture = LoadTexture("assets/pipe.png");
+    birdTexture = LoadTexture(TextFormat("%s/bird.png", assetPath));
+    backgroundTexture = LoadTexture(TextFormat("%s/background.png", assetPath));
+    pipeTexture = LoadTexture(TextFormat("%s/pipe.png", assetPath));
 
     bird.texture = birdTexture;
     bird.Reset();

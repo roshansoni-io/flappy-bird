@@ -5,6 +5,11 @@ main
 *.exe
 .local/
 
+# CMake build directories
+build/
+build-web/
+cmake-build-*/
+
 # Web build
 web/
 
